@@ -1231,6 +1231,51 @@
     }
 
     /* =====================================================
+       MERGE SPEECH RESULTS  (fixes the repeated words on Android)
+
+       Android Chrome does not return "new words only". With
+       continuous mode it returns the SAME sentence again and again,
+       growing each time:  "10" , "10 கிலோ" , "10 கிலோ கேரட்" ...
+       and marks every one of them as final.
+       The old code appended each one, so the text repeated.
+       Here a result that only repeats / extends the previous one
+       REPLACES it, and only a really new phrase is appended.
+    ===================================================== */
+
+    function mergeCumulative(parts) {
+
+        const norm = text => text.toLowerCase().replace(/\s+/g, " ").trim();
+
+        const out = [];
+
+        for (const raw of parts) {
+
+            const text = String(raw || "").replace(/\s+/g, " ").trim();
+
+            if (!text) continue;
+
+            if (out.length) {
+
+                const last = norm(out[out.length - 1]);
+                const next = norm(text);
+
+                // same text again, or a shorter copy of the last phrase
+                if (next === last || last.startsWith(next)) continue;
+
+                // the last phrase grew into a longer one -> replace it
+                if (next.startsWith(last)) {
+                    out[out.length - 1] = text;
+                    continue;
+                }
+            }
+
+            out.push(text);
+        }
+
+        return out.join(" ");
+    }
+
+    /* =====================================================
        SPEECH RECOGNITION
     ===================================================== */
 
@@ -1269,22 +1314,15 @@
 
             instance.onresult = event => {
 
-                interimTranscript = "";
+                // Read EVERY result of this session and merge them.
+                // (Never append by resultIndex - that causes the repeats.)
+                const parts = [];
 
-                for (
-                    let i = event.resultIndex;
-                    i < event.results.length;
-                    i++
-                ) {
-
-                    const spoken = event.results[i][0].transcript || "";
-
-                    if (event.results[i].isFinal) {
-                        finalTranscript += spoken + " ";
-                    } else {
-                        interimTranscript += spoken;
-                    }
+                for (let i = 0; i < event.results.length; i++) {
+                    parts.push(event.results[i][0].transcript || "");
                 }
+
+                interimTranscript = mergeCumulative(parts);
 
                 const complete = (
                     finalTranscript + " " + interimTranscript
@@ -1333,6 +1371,12 @@
                 if (recognition !== instance) return;
 
                 recognition = null;
+
+                // keep what this session heard, then start the next one clean
+                finalTranscript = (
+                    finalTranscript + " " + interimTranscript
+                ).trim();
+                interimTranscript = "";
 
                 if (listening && !manualStop) {
 
@@ -1434,7 +1478,7 @@
     function completeRecording() {
 
         const text = (
-            finalTranscript ||
+            (finalTranscript + " " + interimTranscript).trim() ||
             $("voiceTranscript").value ||
             ""
         ).trim();
