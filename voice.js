@@ -16,6 +16,12 @@
     let finalTranscript = "";
     let interimTranscript = "";
     let restartTimer = null;
+
+    // Keyboard-mic mode: used when the page runs inside an installed
+    // "website to app" wrapper whose WebView has no speech recognition.
+    let keyboardMode = false;
+    let keyboardTimer = null;
+    let noResultTimer = null;
     let previewItems = [];
     let isSaving = false;
 
@@ -1276,6 +1282,40 @@
     }
 
     /* =====================================================
+       KEYBOARD-MIC MODE  (installed app / WebView fallback)
+
+       Website-to-app builders (Median etc.) open your site in an
+       Android WebView, which usually has NO speech recognition.
+       The phone keyboard's own microphone (Gboard) still works in
+       any text box, so we guide the user to it and auto-fill the
+       form when the typing/dictation pauses.
+    ===================================================== */
+
+    const KEYBOARD_HELP =
+        "Mic recording is not available in this app. Tap the text box below, " +
+        "press the microphone on your keyboard, speak your expenses, " +
+        "then wait a moment (or tap Fill Form from Text).";
+
+    function enableKeyboardMode(message) {
+
+        keyboardMode = true;
+
+        if (noResultTimer) {
+            clearTimeout(noResultTimer);
+            noResultTimer = null;
+        }
+
+        setStatus("error", message || KEYBOARD_HELP);
+
+        const box = $("voiceTranscript");
+
+        if (box) {
+            box.placeholder = "Tap here, then press the microphone on your keyboard and speak...";
+            box.focus();
+        }
+    }
+
+    /* =====================================================
        SPEECH RECOGNITION
     ===================================================== */
 
@@ -1316,6 +1356,11 @@
 
                 // Read EVERY result of this session and merge them.
                 // (Never append by resultIndex - that causes the repeats.)
+                if (noResultTimer) {
+                    clearTimeout(noResultTimer);
+                    noResultTimer = null;
+                }
+
                 const parts = [];
 
                 for (let i = 0; i < event.results.length; i++) {
@@ -1360,6 +1405,18 @@
                     }
 
                     setStatus("error", messages[event.error] || "Voice recognition error.");
+
+                    // microphone / speech service blocked (typical inside an app wrapper)
+                    if ([
+                        "not-allowed",
+                        "service-not-allowed",
+                        "audio-capture",
+                        "language-not-supported"
+                    ].includes(event.error)) {
+                        enableKeyboardMode(
+                            (messages[event.error] || "") + " " + KEYBOARD_HELP
+                        );
+                    }
 
                 } else if (event.error === "no-speech") {
                     setStatus("listening", messages[event.error]);
@@ -1433,6 +1490,24 @@
 
         setStatus("listening", "Starting microphone...");
         startRecognition();
+
+        // Some WebViews start "listening" but never return any text.
+        // If nothing arrives for 10 seconds, point the user to the keyboard mic.
+        if (noResultTimer) clearTimeout(noResultTimer);
+
+        noResultTimer = setTimeout(() => {
+
+            noResultTimer = null;
+
+            if (listening && !finalTranscript && !interimTranscript) {
+                keyboardMode = true;
+                setStatus(
+                    "listening",
+                    "Not hearing anything? Inside an installed app use your keyboard microphone in the text box below."
+                );
+            }
+
+        }, 10000);
     }
 
     /* =====================================================
@@ -1445,6 +1520,11 @@
 
         listening = false;
         manualStop = true;
+
+        if (noResultTimer) {
+            clearTimeout(noResultTimer);
+            noResultTimer = null;
+        }
 
         if (restartTimer) {
             clearTimeout(restartTimer);
@@ -1498,6 +1578,11 @@
     ===================================================== */
 
     function clearRecording() {
+
+        if (noResultTimer) {
+            clearTimeout(noResultTimer);
+            noResultTimer = null;
+        }
 
         if (listening) {
 
@@ -1555,6 +1640,24 @@
 
         $("voiceClearBtn")?.addEventListener("click", clearRecording);
 
+        // keyboard-mic mode: fill the form automatically when typing/dictation pauses
+        $("voiceTranscript")?.addEventListener("input", () => {
+
+            if (!keyboardMode || listening) return;
+
+            clearTimeout(keyboardTimer);
+
+            keyboardTimer = setTimeout(() => {
+
+                const text = $("voiceTranscript").value.trim();
+
+                if (text && extractExpenses(text, "").length) {
+                    applyText(text);
+                }
+
+            }, 1500);
+        });
+
         if ($("voiceLang")) {
 
             $("voiceLang").value =
@@ -1573,10 +1676,8 @@
 
             mic.disabled = true;
 
-            setStatus(
-                "error",
-                "Voice recording is unavailable in this browser (use Chrome or Edge). " +
-                "You can still type your expenses in the box and press Fill Form from Text."
+            enableKeyboardMode(
+                "Voice recording is unavailable here. " + KEYBOARD_HELP
             );
 
             return;
