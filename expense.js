@@ -11,7 +11,7 @@ const REQUIRED_IDS = [
     "rangeChips", "fromDate", "toDate", "creatorFilter", "typeFilter", "searchBox",
     "rowsPerPage", "clearFilterBtn", "pdfBtn", "updateBtn", "expenseTable",
     "expenseTableBody", "emptyMessage", "pager", "editModal", "editCreator",
-    "editDate", "editTime", "editExpenseType", "editCategory", "editComment", "editAmount",
+    "editDate", "editTime", "editExpenseType", "editCategory", "editComment", "editQuantity", "editAmount",
     "totalEntries", "todayEntries", "totalAmount", "tableGrandTotal", "pageGrandTotal",
     "filterSummary", "rangeText"
 ];
@@ -58,7 +58,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 /* ---------------- load ---------------- */
 async function loadExpenses() {
     $("expenseTableBody").innerHTML =
-        `<tr><td colspan="9" class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Loading expenses...</td></tr>`;
+        `<tr><td colspan="10" class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Loading expenses...</td></tr>`;
     try {
         const [rows, types, creators] = await Promise.all([
             fetchAllRows(() => db.from("expenses").select("*")
@@ -85,7 +85,7 @@ async function loadExpenses() {
     } catch (e) {
         console.error(e);
         $("expenseTableBody").innerHTML =
-            `<tr><td colspan="9" class="text-center text-danger py-4"><i class="fa-solid fa-circle-exclamation me-2"></i>Unable to load expenses.</td></tr>`;
+            `<tr><td colspan="10" class="text-center text-danger py-4"><i class="fa-solid fa-circle-exclamation me-2"></i>Unable to load expenses.</td></tr>`;
         showError(e.message || "Unable to load expenses.");
     }
 }
@@ -154,6 +154,11 @@ function applyFilters() {
 }
 
 /* ---------------- render ---------------- */
+/* quantity for display: 3 -> "3", 2.50 -> "2.5", empty/old rows -> "1" */
+function fmtQty(v) {
+    const q = Number(v);
+    return Number.isFinite(q) && q > 0 ? String(+q.toFixed(2)) : "1";
+}
 function totalPages() { return Math.max(1, Math.ceil(filtered.length / rowsPerPage)); }
 function render() {
     page = Math.min(page, totalPages());
@@ -188,6 +193,7 @@ function render() {
             <td data-label="Type"><span class="tag">${esc(e.expense_type)}</span></td>
             <td data-label="Category"><span class="tag gray">${esc(e.category)}</span></td>
             <td data-label="Description" class="description-cell">${esc(e.comment)}</td>
+            <td data-label="Quantity" class="text-center"><span class="tag gray">${fmtQty(e.quantity)}</span></td>
             <td data-label="Amount" class="amount-cell">${money(e.amount)}</td>
             <td class="action-cell text-center">
                 <button class="btn btn-sm btn-soft btn-icon" onclick="openEdit(${e.id})" title="Edit"><i class="fa-solid fa-pen"></i></button>
@@ -230,6 +236,7 @@ function openEdit(id) {
     $("editExpenseType").value = e.expense_type || "";
     $("editCategory").value = e.category || "";
     $("editComment").value = e.comment || "";
+    $("editQuantity").value = fmtQty(e.quantity);
     $("editAmount").value = e.amount;
     bootstrap.Modal.getOrCreateInstance($("editModal")).show();
 }
@@ -237,9 +244,11 @@ async function updateExpense() {
     const v = {
         creator: $("editCreator").value, expense_date: $("editDate").value,
         expense_time: $("editTime").value || null, expense_type: $("editExpenseType").value,
-        category: $("editCategory").value, comment: $("editComment").value.trim(), amount: Number($("editAmount").value)
+        category: $("editCategory").value, comment: $("editComment").value.trim(),
+        quantity: Number($("editQuantity").value || 1), amount: Number($("editAmount").value)
     };
     if (!v.creator || !v.expense_date) return showError("Please select the creator and date.");
+    if (!Number.isFinite(v.quantity) || v.quantity <= 0) return showError("Please enter a valid quantity.");
     if (!Number.isFinite(v.amount) || v.amount <= 0) return showError("Please enter a valid amount.");
     const btn = $("updateBtn"); setBusy(btn, true, "Updating...");
     try {
@@ -274,12 +283,12 @@ function downloadPDF() {
     const total = filtered.reduce((s, e) => s + Number(e.amount || 0), 0);
     doc.autoTable({
         startY: 76,
-        head: [["#", "Creator", "Date", "Time", "Type", "Category", "Description", "Amount"]],
-        body: filtered.map((e, i) => [i + 1, e.creator || "", fmtDate(e.expense_date), fmtTime(e.expense_time), e.expense_type || "", e.category || "", e.comment || "", rs(e.amount)]),
-        foot: [[{ content: "Grand Total", colSpan: 7, styles: { halign: "right" } }, rs(total)]],
+        head: [["#", "Creator", "Date", "Time", "Type", "Category", "Description", "Qty", "Amount"]],
+        body: filtered.map((e, i) => [i + 1, e.creator || "", fmtDate(e.expense_date), fmtTime(e.expense_time), e.expense_type || "", e.category || "", e.comment || "", fmtQty(e.quantity), rs(e.amount)]),
+        foot: [[{ content: "Grand Total", colSpan: 8, styles: { halign: "right" } }, rs(total)]],
         styles: { fontSize: 9, cellPadding: 5 },
         headStyles: { fillColor: [79, 70, 229] }, footStyles: { fillColor: [238, 240, 251], textColor: 30 },
-        columnStyles: { 6: { cellWidth: 220 }, 7: { halign: "right" } }
+        columnStyles: { 6: { cellWidth: 200 }, 7: { halign: "center" }, 8: { halign: "right" } }
     });
     doc.save(`expenses-${todayStr()}.pdf`);
 }
