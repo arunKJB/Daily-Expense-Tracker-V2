@@ -1316,6 +1316,46 @@
     }
 
     /* =====================================================
+       MICROPHONE PERMISSION  (needed inside installed apps)
+
+       Website-to-app wrappers (Median etc.) show their native
+       "Allow microphone?" dialog ONLY when the page calls
+       navigator.mediaDevices.getUserMedia(). SpeechRecognition on
+       its own never triggers it, so the app never asked.
+       We ask first, close the stream at once, then start recognition.
+    ===================================================== */
+
+    async function ensureMicPermission() {
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            return "unknown";          // let SpeechRecognition try on its own
+        }
+
+        try {
+
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+            stream.getTracks().forEach(track => track.stop());
+
+            return "granted";
+
+        } catch (error) {
+
+            console.warn("Microphone permission:", error);
+
+            if (error && (error.name === "NotAllowedError" || error.name === "SecurityError")) {
+                return "denied";
+            }
+
+            if (error && error.name === "NotFoundError") {
+                return "nomic";
+            }
+
+            return "unknown";
+        }
+    }
+
+    /* =====================================================
        SPEECH RECOGNITION
     ===================================================== */
 
@@ -1488,26 +1528,49 @@
         listening = true;
         manualStop = false;
 
-        setStatus("listening", "Starting microphone...");
-        startRecognition();
+        setStatus("listening", "Requesting microphone permission...");
 
-        // Some WebViews start "listening" but never return any text.
-        // If nothing arrives for 10 seconds, point the user to the keyboard mic.
-        if (noResultTimer) clearTimeout(noResultTimer);
+        ensureMicPermission().then(result => {
 
-        noResultTimer = setTimeout(() => {
+            // user pressed stop / clear while the permission dialog was open
+            if (!listening) return;
 
-            noResultTimer = null;
+            if (result === "denied" || result === "nomic") {
 
-            if (listening && !finalTranscript && !interimTranscript) {
-                keyboardMode = true;
-                setStatus(
-                    "listening",
-                    "Not hearing anything? Inside an installed app use your keyboard microphone in the text box below."
+                listening = false;
+                manualStop = false;
+
+                enableKeyboardMode(
+                    (result === "denied"
+                        ? "Microphone permission was not allowed. Open your phone Settings > Apps > this app > Permissions > Microphone and allow it. "
+                        : "No microphone was found. ") +
+                    KEYBOARD_HELP
                 );
+
+                return;
             }
 
-        }, 10000);
+            setStatus("listening", "Starting microphone...");
+            startRecognition();
+
+            // Some WebViews start "listening" but never return any text.
+            // If nothing arrives for 10 seconds, point the user to the keyboard mic.
+            if (noResultTimer) clearTimeout(noResultTimer);
+
+            noResultTimer = setTimeout(() => {
+
+                noResultTimer = null;
+
+                if (listening && !finalTranscript && !interimTranscript) {
+                    keyboardMode = true;
+                    setStatus(
+                        "listening",
+                        "Not hearing anything? Inside an installed app use your keyboard microphone in the text box below."
+                    );
+                }
+
+            }, 10000);
+        });
     }
 
     /* =====================================================
