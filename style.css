@@ -25,11 +25,20 @@ a{color:var(--primary)}
 .main-container{max-width:1180px;padding-top:22px}
 
 /* ---------- NAVBAR (desktop top bar) ---------- */
-.app-nav{
+/* .app-nav{
   position:sticky; top:0; z-index:1030;
   background:rgba(0, 255, 255, 0.86);
   -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
   border-bottom:1px solid var(--border);
+  padding-top:env(safe-area-inset-top);
+} */
+
+.app-nav{
+  position:sticky; top:0; z-index:1030;
+  background:linear-gradient(135deg, rgba(238,240,255,.92), rgba(245,243,255,.92));
+  -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
+  border-bottom:1px solid rgba(79,70,229,.18);
+  box-shadow:0 4px 18px rgba(79,70,229,.10);
   padding-top:env(safe-area-inset-top);
 }
 .app-nav .inner{height:var(--nav-h);display:flex;align-items:center;justify-content:space-between;gap:16px}
