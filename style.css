@@ -1421,3 +1421,100 @@ a{color:var(--primary)}
 @media (prefers-reduced-motion: reduce) {
     .loader-ring::before, .loader-badge { animation-duration: 2.5s; }
 }
+
+
+/* ==========================================
+   MEDIAN APP - TOP SPACING FIX
+   Daily Expense Tracker V3
+========================================== */
+
+/* Remove browser default spacing */
+
+html,
+body {
+    margin: 0 !important;
+    padding: 0 !important;
+
+    width: 100%;
+    min-height: 100%;
+
+    overflow-x: hidden;
+}
+
+/* Prevent unwanted top spacing */
+
+html {
+    scroll-padding-top: 0;
+}
+
+body {
+    position: relative;
+
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}
+
+/* Navigation starts at the top */
+
+.app-nav {
+    position: sticky !important;
+
+    top: 0 !important;
+
+    margin-top: 0 !important;
+
+    padding-top: 0 !important;
+
+    transform: none !important;
+}
+
+/* Remove additional spacing from inner navigation */
+
+.app-nav .inner {
+    margin-top: 0 !important;
+}
+
+/* Main page content */
+
+main,
+.main-content,
+.page-content {
+    margin-top: 0;
+}
+
+/* Remove accidental first-child spacing */
+
+body > :first-child {
+    margin-top: 0;
+}
+
+/* Mobile-specific corrections */
+
+@media screen and (max-width: 768px) {
+
+    html,
+    body {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+
+    .app-nav {
+        padding-top: 0 !important;
+        top: 0 !important;
+    }
+
+    .app-nav .inner {
+        min-height: 66px;
+    }
+
+}
+
+/* Keep bottom safe area for modern phones */
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+
+    body {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+}
