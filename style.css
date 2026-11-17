@@ -35,12 +35,19 @@ a{color:var(--primary)}
 
 .app-nav{
   position:sticky; top:0; z-index:1030;
-  background:linear-gradient(135deg, rgba(238,240,255,.92), rgba(245,243,255,.92));
+  background:linear-gradient(135deg,#4f46e5,#7c3aed);
   -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
-  border-bottom:1px solid rgba(79,70,229,.18);
-  box-shadow:0 4px 18px rgba(79,70,229,.10);
+  border-bottom:none;
+  box-shadow:0 6px 20px rgba(79,70,229,.30);
   padding-top:env(safe-area-inset-top);
 }
+.app-nav .brand,
+.app-nav .nav-links a,
+.app-nav .tag,
+.app-nav .tag small { color:#fff; }
+.app-nav .nav-links a.active { background:rgba(255,255,255,.18); }
+.app-nav .tag { background:rgba(255,255,255,.16); }
+
 .app-nav .inner{height:var(--nav-h);display:flex;align-items:center;justify-content:space-between;gap:16px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:800;color:var(--text);text-decoration:none;letter-spacing:-.2px}
 .brand:hover{color:var(--text)}
